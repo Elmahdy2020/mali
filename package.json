@@ -9,16 +9,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "uuid": "^13.0.0",
-    "react-dom": "^19.2.3",
+    "@neondatabase/serverless": "^1.0.2",
+    "@prisma/client": "^7.1.0",
     "react": "^19.2.3",
-    "recharts": "^3.5.1"
+    "react-dom": "^19.2.3",
+    "recharts": "^3.5.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vercel/node": "^5.5.15",
     "@vitejs/plugin-react": "^5.0.0",
+    "dotenv": "^17.2.3",
+    "prisma": "^7.1.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

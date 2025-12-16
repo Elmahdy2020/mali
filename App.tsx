@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Expense, Budget, AlertThresholds, BudgetMap, Income, Obligation, ObligationPayment, OpeningSavings } from './types';
 import { ExpenseInput } from './components/ExpenseInput';
 import { BudgetCard } from './components/BudgetCard';
@@ -10,46 +10,23 @@ import { YearlyReportModal } from './components/YearlyReportModal';
 import { IncomeManager } from './components/IncomeManager';
 import { ObligationManager } from './components/ObligationManager';
 import { SavingsManager } from './components/SavingsManager';
+import * as api from './services/api';
 
 const App: React.FC = () => {
   // --- View State ---
   type View = 'dashboard' | 'income' | 'obligations' | 'savings';
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [isLoading, setIsLoading] = useState(true);
 
   // --- Global Settings State ---
-  const [currency, setCurrency] = useState<string>(() => {
-    return localStorage.getItem('app_currency') || 'QAR';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('app_currency', currency);
-  }, [currency]);
+  const [currency, setCurrency] = useState<string>('QAR');
 
   // --- Data States ---
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [incomes, setIncomes] = useState<Income[]>(() => {
-    const saved = localStorage.getItem('incomes');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [obligations, setObligations] = useState<Obligation[]>(() => {
-    const saved = localStorage.getItem('obligations');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [obligationPayments, setObligationPayments] = useState<ObligationPayment[]>(() => {
-    const saved = localStorage.getItem('obligation_payments');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [openingSavings, setOpeningSavings] = useState<OpeningSavings | null>(() => {
-    const saved = localStorage.getItem('opening_savings');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [incomes, setIncomes] = useState<Income[]>([]);
+  const [obligations, setObligations] = useState<Obligation[]>([]);
+  const [obligationPayments, setObligationPayments] = useState<ObligationPayment[]>([]);
+  const [openingSavings, setOpeningSavings] = useState<OpeningSavings | null>(null);
 
   const defaultBudget: Budget = {
     limit: 5000,
@@ -58,31 +35,66 @@ const App: React.FC = () => {
     alertThresholds: { warning: 75, critical: 90 }
   };
 
-  const [budgets, setBudgets] = useState<BudgetMap>(() => {
-    const saved = localStorage.getItem('monthly_budgets');
-    if (saved) {
-      return JSON.parse(saved);
-    }
-    const oldBudget = localStorage.getItem('budget');
-    if (oldBudget) {
-      const parsed = JSON.parse(oldBudget);
-      const currentKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-      return { [currentKey]: { ...defaultBudget, ...parsed } };
-    }
-    return {};
-  });
-
+  const [budgets, setBudgets] = useState<BudgetMap>({});
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showSettings, setShowSettings] = useState(false);
   const [showYearlyReport, setShowYearlyReport] = useState(false);
 
-  // --- Persistence ---
-  useEffect(() => { localStorage.setItem('expenses', JSON.stringify(expenses)); }, [expenses]);
-  useEffect(() => { localStorage.setItem('incomes', JSON.stringify(incomes)); }, [incomes]);
-  useEffect(() => { localStorage.setItem('obligations', JSON.stringify(obligations)); }, [obligations]);
-  useEffect(() => { localStorage.setItem('obligation_payments', JSON.stringify(obligationPayments)); }, [obligationPayments]);
-  useEffect(() => { localStorage.setItem('monthly_budgets', JSON.stringify(budgets)); }, [budgets]);
-  useEffect(() => { localStorage.setItem('opening_savings', JSON.stringify(openingSavings)); }, [openingSavings]);
+  // --- Load data from API on mount ---
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        const [
+          expensesData,
+          incomesData,
+          obligationsData,
+          paymentsData,
+          budgetsData,
+          savingsData,
+          settingsData
+        ] = await Promise.all([
+          api.fetchExpenses(),
+          api.fetchIncomes(),
+          api.fetchObligations(),
+          api.fetchPayments(),
+          api.fetchBudgets(),
+          api.fetchSavings(),
+          api.fetchSettings()
+        ]);
+
+        setExpenses(expensesData);
+        setIncomes(incomesData);
+        setObligations(obligationsData);
+        setObligationPayments(paymentsData);
+        setBudgets(budgetsData);
+        setOpeningSavings(savingsData);
+        setCurrency(settingsData.currency);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Fallback to localStorage if API fails
+        const savedExpenses = localStorage.getItem('expenses');
+        const savedIncomes = localStorage.getItem('incomes');
+        const savedObligations = localStorage.getItem('obligations');
+        const savedPayments = localStorage.getItem('obligation_payments');
+        const savedBudgets = localStorage.getItem('monthly_budgets');
+        const savedSavings = localStorage.getItem('opening_savings');
+        const savedCurrency = localStorage.getItem('app_currency');
+
+        if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+        if (savedIncomes) setIncomes(JSON.parse(savedIncomes));
+        if (savedObligations) setObligations(JSON.parse(savedObligations));
+        if (savedPayments) setObligationPayments(JSON.parse(savedPayments));
+        if (savedBudgets) setBudgets(JSON.parse(savedBudgets));
+        if (savedSavings) setOpeningSavings(JSON.parse(savedSavings));
+        if (savedCurrency) setCurrency(savedCurrency);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   // --- Helpers ---
   const formatMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -105,27 +117,21 @@ const App: React.FC = () => {
     return incomes.filter(i => i.date.startsWith(currentMonthKey));
   }, [incomes, currentMonthKey]);
 
-  // Filter Obligations for the current month based on dueDate
   const currentMonthObligations = useMemo(() => {
     return obligations.filter(o => o.dueDate && o.dueDate.startsWith(currentMonthKey));
   }, [obligations, currentMonthKey]);
 
   const currentMonthPayments = useMemo(() => {
-    // Find payments that belong to the current month's obligations
-    // OR payments specifically made in this month (legacy support, though we primarily filter by obligation date now)
     return obligationPayments.filter(p => p.monthKey === currentMonthKey || currentMonthObligations.some(o => o.id === p.obligationId));
   }, [obligationPayments, currentMonthKey, currentMonthObligations]);
 
   // Totals for Dashboard
   const totalSpentExpenses = currentMonthExpenses.reduce((sum, item) => sum + item.amount, 0);
   const totalIncome = currentMonthIncomes.reduce((sum, item) => sum + item.amount, 0);
-
-  // Calculate total paid only for the obligations visible in this month
   const totalPaidObligations = currentMonthPayments
     .filter(p => currentMonthObligations.some(o => o.id === p.obligationId))
     .reduce((sum, item) => sum + item.amountPaid, 0);
 
-  // Total Cumulative Savings (Wealth Calculation)
   const totalCumulativeSavings = useMemo(() => {
     const allIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
     const allExpense = expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -152,40 +158,149 @@ const App: React.FC = () => {
     });
   }, [currentMonthExpenses, activeBudget]);
 
-  // --- Handlers ---
-  const handleAddExpense = (expense: Expense) => setExpenses(prev => [expense, ...prev]);
-  const handleDeleteExpense = (id: string) => setExpenses(prev => prev.filter(e => e.id !== id));
+  // --- Handlers with API calls ---
+  const handleAddExpense = useCallback(async (expense: Expense) => {
+    try {
+      const created = await api.createExpense({
+        amount: expense.amount,
+        currency: expense.currency,
+        category: expense.category,
+        date: expense.date,
+        description: expense.description
+      });
+      setExpenses(prev => [created, ...prev]);
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      // Fallback: add locally
+      setExpenses(prev => [expense, ...prev]);
+    }
+  }, []);
 
-  const handleAddIncome = (income: Income) => setIncomes(prev => [income, ...prev]);
-  const handleDeleteIncome = (id: string) => setIncomes(prev => prev.filter(i => i.id !== id));
+  const handleDeleteExpense = useCallback(async (id: string) => {
+    try {
+      await api.deleteExpense(id);
+      setExpenses(prev => prev.filter(e => e.id !== id));
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+    }
+  }, []);
 
-  const handleAddObligation = (ob: Obligation) => setObligations(prev => [...prev, ob]);
-  const handleDeleteObligation = (id: string) => {
-    setObligations(prev => prev.filter(o => o.id !== id));
-    setObligationPayments(prev => prev.filter(p => p.obligationId !== id));
-  };
-  const handleTogglePayment = (obligationId: string, amount: number) => {
-    const existing = obligationPayments.find(p => p.obligationId === obligationId);
-    if (existing) {
-      setObligationPayments(prev => prev.filter(p => p.id !== existing.id));
-    } else {
-      const newPayment: ObligationPayment = {
-        id: Math.random().toString(36).substring(2, 9),
+  const handleAddIncome = useCallback(async (income: Income) => {
+    try {
+      const created = await api.createIncome({
+        source: income.source,
+        amount: income.amount,
+        currency: income.currency,
+        date: income.date,
+        type: income.type,
+        notes: income.notes
+      });
+      setIncomes(prev => [created, ...prev]);
+    } catch (error) {
+      console.error('Error creating income:', error);
+      setIncomes(prev => [income, ...prev]);
+    }
+  }, []);
+
+  const handleDeleteIncome = useCallback(async (id: string) => {
+    try {
+      await api.deleteIncome(id);
+      setIncomes(prev => prev.filter(i => i.id !== id));
+    } catch (error) {
+      console.error('Error deleting income:', error);
+    }
+  }, []);
+
+  const handleAddObligation = useCallback(async (ob: Obligation) => {
+    try {
+      const created = await api.createObligation({
+        name: ob.name,
+        amount: ob.amount,
+        currency: ob.currency,
+        dueDate: ob.dueDate,
+        category: ob.category,
+        active: ob.active
+      });
+      setObligations(prev => [...prev, created]);
+    } catch (error) {
+      console.error('Error creating obligation:', error);
+      setObligations(prev => [...prev, ob]);
+    }
+  }, []);
+
+  const handleDeleteObligation = useCallback(async (id: string) => {
+    try {
+      await api.deleteObligation(id);
+      setObligations(prev => prev.filter(o => o.id !== id));
+      setObligationPayments(prev => prev.filter(p => p.obligationId !== id));
+    } catch (error) {
+      console.error('Error deleting obligation:', error);
+    }
+  }, []);
+
+  const handleTogglePayment = useCallback(async (obligationId: string, amount: number) => {
+    try {
+      const result = await api.togglePayment({
         obligationId,
         monthKey: currentMonthKey,
         amountPaid: amount,
         datePaid: new Date().toISOString()
-      };
-      setObligationPayments(prev => [...prev, newPayment]);
-    }
-  };
+      });
 
-  const updateBudgetForMonth = (updater: (prevBudget: Budget) => Budget) => {
-    setBudgets(prev => {
-      const startingBudget = prev[currentMonthKey] || activeBudget;
-      return { ...prev, [currentMonthKey]: updater(startingBudget) };
-    });
-  };
+      if (result.deleted) {
+        setObligationPayments(prev => prev.filter(p => p.id !== result.id));
+      } else {
+        setObligationPayments(prev => [...prev, result]);
+      }
+    } catch (error) {
+      console.error('Error toggling payment:', error);
+    }
+  }, [currentMonthKey]);
+
+  const updateBudgetForMonth = useCallback(async (updater: (prevBudget: Budget) => Budget) => {
+    const startingBudget = budgets[currentMonthKey] || activeBudget;
+    const newBudget = updater(startingBudget);
+
+    setBudgets(prev => ({ ...prev, [currentMonthKey]: newBudget }));
+
+    try {
+      await api.updateBudget(currentMonthKey, newBudget);
+    } catch (error) {
+      console.error('Error updating budget:', error);
+    }
+  }, [budgets, currentMonthKey, activeBudget]);
+
+  const handleUpdateOpeningSavings = useCallback(async (savings: OpeningSavings | null) => {
+    setOpeningSavings(savings);
+    if (savings) {
+      try {
+        await api.updateSavings(savings);
+      } catch (error) {
+        console.error('Error updating savings:', error);
+      }
+    }
+  }, []);
+
+  const handleCurrencyChange = useCallback(async (newCurrency: string) => {
+    setCurrency(newCurrency);
+    try {
+      await api.updateSettings(newCurrency);
+    } catch (error) {
+      console.error('Error updating currency:', error);
+    }
+  }, []);
+
+  const handleClearAll = useCallback(async () => {
+    if (confirm('مسح الكل؟')) {
+      setExpenses([]);
+      setIncomes([]);
+      setObligations([]);
+      setObligationPayments([]);
+      setBudgets({});
+      setOpeningSavings(null);
+      // Note: This doesn't clear the database - would need additional API endpoints for that
+    }
+  }, []);
 
   // --- Navigation & UI ---
   const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
@@ -193,6 +308,18 @@ const App: React.FC = () => {
   const currentYear = selectedDate.getFullYear();
   const daysInMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
   const daysRemaining = Math.max(0, daysInMonth - new Date().getDate());
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center" dir="rtl">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">جاري تحميل بياناتك...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-right font-sans" dir="rtl">
@@ -212,8 +339,7 @@ const App: React.FC = () => {
               <button onClick={() => setShowSettings(true)} className="p-2 text-gray-500 bg-gray-50 rounded-full hover:bg-gray-100">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
               </button>
-              <button className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-full hover:bg-red-100"
-                onClick={() => { if (confirm('مسح الكل؟')) { setExpenses([]); setIncomes([]); setObligations([]); setObligationPayments([]); setBudgets({}); setOpeningSavings(null); } }}>
+              <button className="text-xs text-red-500 bg-red-50 px-3 py-2 rounded-full hover:bg-red-100" onClick={handleClearAll}>
                 تصفير
               </button>
             </div>
@@ -292,7 +418,7 @@ const App: React.FC = () => {
           {currentView === 'savings' && (
             <SavingsManager
               openingSavings={openingSavings}
-              onUpdateOpeningSavings={setOpeningSavings}
+              onUpdateOpeningSavings={handleUpdateOpeningSavings}
               currency={currency}
             />
           )}
@@ -309,7 +435,7 @@ const App: React.FC = () => {
           thresholds={activeBudget.alertThresholds}
           currentCurrency={currency}
           onSave={(t, newCurrency) => {
-            setCurrency(newCurrency);
+            handleCurrencyChange(newCurrency);
             updateBudgetForMonth(prev => ({ ...prev, alertThresholds: t }));
           }}
         />
