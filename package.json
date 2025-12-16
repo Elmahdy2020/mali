@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
-    "@prisma/client": "^7.1.0",
+    "@prisma/client": "^5.22.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.5.1",
@@ -23,8 +23,7 @@
     "@types/react-dom": "^19.0.0",
     "@vercel/node": "^5.5.15",
     "@vitejs/plugin-react": "^5.0.0",
-    "dotenv": "^17.2.3",
-    "prisma": "^7.1.0",
+    "prisma": "^5.22.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

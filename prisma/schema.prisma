@@ -3,7 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model Expense {
@@ -11,31 +13,30 @@ model Expense {
   amount      Float
   currency    String   @default("QAR")
   category    String
-  date        String   // YYYY-MM-DD
+  date        String
   description String
   createdAt   DateTime @default(now())
 }
 
 model Income {
-  id       String   @id @default(cuid())
-  source   String
-  amount   Float
-  currency String   @default("QAR")
-  date     String   // YYYY-MM-DD
-  type     String   // salary, freelance, gift, other
-  notes    String?
+  id        String   @id @default(cuid())
+  source    String
+  amount    Float
+  currency  String   @default("QAR")
+  date      String
+  type      String
+  notes     String?
   createdAt DateTime @default(now())
 }
 
 model Obligation {
-  id       String  @id @default(cuid())
+  id       String              @id @default(cuid())
   name     String
   amount   Float
-  currency String  @default("QAR")
-  dueDate  String  // YYYY-MM-DD
+  currency String              @default("QAR")
+  dueDate  String
   category String
-  active   Boolean @default(true)
-  
+  active   Boolean             @default(true)
   payments ObligationPayment[]
 }
 
@@ -43,19 +44,19 @@ model ObligationPayment {
   id           String     @id @default(cuid())
   obligationId String
   obligation   Obligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
-  monthKey     String     // YYYY-MM
+  monthKey     String
   amountPaid   Float
   datePaid     String
 }
 
 model Budget {
-  id                String  @id @default(cuid())
-  monthKey          String  @unique // YYYY-MM
-  limitAmount       Float   @default(5000)
-  currency          String  @default("QAR")
-  categoryLimits    String  @default("{}") // JSON string
-  warningThreshold  Int     @default(75)
-  criticalThreshold Int     @default(90)
+  id                String @id @default(cuid())
+  monthKey          String @unique
+  limitAmount       Float  @default(5000)
+  currency          String @default("QAR")
+  categoryLimits    String @default("{}")
+  warningThreshold  Int    @default(75)
+  criticalThreshold Int    @default(90)
 }
 
 model OpeningSavings {
