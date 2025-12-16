@@ -12,19 +12,19 @@ model Expense {
   amount      Float
   currency    String   @default("QAR")
   category    String
-  date        String   // YYYY-MM-DD
+  date        String // YYYY-MM-DD
   description String
   createdAt   DateTime @default(now())
 }
 
 model Income {
-  id       String   @id @default(cuid())
-  source   String
-  amount   Float
-  currency String   @default("QAR")
-  date     String   // YYYY-MM-DD
-  type     String   // salary, freelance, gift, other
-  notes    String?
+  id        String   @id @default(cuid())
+  source    String
+  amount    Float
+  currency  String   @default("QAR")
+  date      String // YYYY-MM-DD
+  type      String // salary, freelance, gift, other
+  notes     String?
   createdAt DateTime @default(now())
 }
 
@@ -33,10 +33,10 @@ model Obligation {
   name     String
   amount   Float
   currency String  @default("QAR")
-  dueDate  String  // YYYY-MM-DD
+  dueDate  String // YYYY-MM-DD
   category String
   active   Boolean @default(true)
-  
+
   payments ObligationPayment[]
 }
 
@@ -44,19 +44,19 @@ model ObligationPayment {
   id           String     @id @default(cuid())
   obligationId String
   obligation   Obligation @relation(fields: [obligationId], references: [id], onDelete: Cascade)
-  monthKey     String     // YYYY-MM
+  monthKey     String // YYYY-MM
   amountPaid   Float
   datePaid     String
 }
 
 model Budget {
-  id                String  @id @default(cuid())
-  monthKey          String  @unique // YYYY-MM
-  limitAmount       Float   @default(5000)
-  currency          String  @default("QAR")
-  categoryLimits    String  @default("{}") // JSON string
-  warningThreshold  Int     @default(75)
-  criticalThreshold Int     @default(90)
+  id                String @id @default(cuid())
+  monthKey          String @unique // YYYY-MM
+  limitAmount       Float  @default(5000)
+  currency          String @default("QAR")
+  categoryLimits    String @default("{}") // JSON string
+  warningThreshold  Int    @default(75)
+  criticalThreshold Int    @default(90)
 }
 
 model OpeningSavings {
