@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from './lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,23 +21,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'POST') {
             const { obligationId, monthKey, amountPaid, datePaid } = req.body;
 
-            // Check if payment already exists (toggle behavior)
             const existing = await prisma.obligationPayment.findFirst({
                 where: { obligationId, monthKey }
             });
 
             if (existing) {
-                // Delete existing payment (toggle off)
                 await prisma.obligationPayment.delete({ where: { id: existing.id } });
                 return res.status(200).json({ deleted: true, id: existing.id });
             }
 
-            // Create new payment
             const payment = await prisma.obligationPayment.create({
                 data: {
                     obligationId,
                     monthKey,
-                    amountPaid,
+                    amountPaid: Number(amountPaid),
                     datePaid
                 }
             });
@@ -52,8 +51,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Obligation payments API error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error', message: error.message });
     }
 }

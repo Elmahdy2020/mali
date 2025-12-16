@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from './lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,7 +14,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         if (req.method === 'GET') {
-            // Get the most recent opening savings (latest year)
             const savings = await prisma.openingSavings.findFirst({
                 orderBy: { year: 'desc' }
             });
@@ -23,29 +24,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { year, cashUSD, usdToQarRate, goldGrams, goldPricePerGramQAR, totalOpeningQAR } = req.body;
 
             const savings = await prisma.openingSavings.upsert({
-                where: { year },
+                where: { year: Number(year) },
                 update: {
-                    cashUSD,
-                    usdToQarRate,
-                    goldGrams,
-                    goldPricePerGramQAR,
-                    totalOpeningQAR
+                    cashUSD: Number(cashUSD),
+                    usdToQarRate: Number(usdToQarRate),
+                    goldGrams: Number(goldGrams),
+                    goldPricePerGramQAR: Number(goldPricePerGramQAR),
+                    totalOpeningQAR: Number(totalOpeningQAR)
                 },
                 create: {
-                    year,
-                    cashUSD,
-                    usdToQarRate,
-                    goldGrams,
-                    goldPricePerGramQAR,
-                    totalOpeningQAR
+                    year: Number(year),
+                    cashUSD: Number(cashUSD),
+                    usdToQarRate: Number(usdToQarRate),
+                    goldGrams: Number(goldGrams),
+                    goldPricePerGramQAR: Number(goldPricePerGramQAR),
+                    totalOpeningQAR: Number(totalOpeningQAR)
                 }
             });
             return res.status(200).json(savings);
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Savings API error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error', message: error.message });
     }
 }

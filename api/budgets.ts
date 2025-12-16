@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import prisma from './lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,7 +15,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         if (req.method === 'GET') {
             const budgets = await prisma.budget.findMany();
-            // Convert to BudgetMap format
             const budgetMap: Record<string, any> = {};
             budgets.forEach(b => {
                 budgetMap[b.monthKey] = {
@@ -35,7 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const budget = await prisma.budget.upsert({
                 where: { monthKey },
                 update: {
-                    limitAmount: limit,
+                    limitAmount: Number(limit),
                     currency: currency || 'QAR',
                     categoryLimits: JSON.stringify(categoryLimits || {}),
                     warningThreshold: alertThresholds?.warning || 75,
@@ -43,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 },
                 create: {
                     monthKey,
-                    limitAmount: limit || 5000,
+                    limitAmount: Number(limit) || 5000,
                     currency: currency || 'QAR',
                     categoryLimits: JSON.stringify(categoryLimits || {}),
                     warningThreshold: alertThresholds?.warning || 75,
@@ -54,8 +55,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         return res.status(405).json({ error: 'Method not allowed' });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Budgets API error:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(500).json({ error: 'Internal server error', message: error.message });
     }
 }
